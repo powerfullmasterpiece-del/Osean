@@ -1,0 +1,259 @@
+dependencies {
+    // Jetpack Compose UI & Material 3 (Futuristic Dark Theme)
+    implementation(platform("androidx.compose:compose-bom:2024.09.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    
+    // Firebase AI (Gemini 1.5 Pro & Vertex AI Integration)
+    implementation(platform("com.google.firebase:firebase-bom:33.4.0"))
+    implementation("com.google.firebase:firebase-ai")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    
+    // Offline Storage (Room Database)
+    val room_version = "2.6.1"
+    implementation("androidx.room:room-runtime:$room_version")
+    implementation("androidx.room:room-ktx:$room_version")
+    
+    // Media, Audio & Image Loader
+    implementation("io.coil-kt:coil-compose:2.7.0")
+}
+
+package com.aistudio.dc27mission.data
+
+data class StudyTopic(
+    val id: String,
+    val titleTelugu: String,
+    val titleEnglish: String,
+    val subject: String,
+    val isCompleted: Boolean = false,
+    val revisionDue: Boolean = false
+)
+
+data class MCQQuestion(
+    val id: String,
+    val question: String,
+    val options: List<String>,
+    val correctOptionIndex: Int,
+    val explanationTelugu: String,
+    val examinerTrap: String
+)
+
+package com.aistudio.dc27mission.data
+
+import com.google.firebase.ai.FirebaseAI
+import com.google.firebase.ai.type.GenerativeModel
+import com.google.firebase.ai.type.content
+
+class DC27GeminiMasterEngine {
+
+    private val masterModel = FirebaseAI.getInstance().getGenerativeModel(
+        modelName = "gemini-1.5-pro",
+        systemInstruction = content {
+            text("""
+                You are DC-27: The Ultimate APPSC Group-I AI Institute, Examiner Analyst & Personal Mentor for Telugu Aspirants.
+                Your duties:
+                1. Teach any topic in simple Telugu with real-life examples, English terminology, Articles, and Core Concepts.
+                2. Explain APPSC Examiner Traps, PYQ trends, and student confusion areas.
+                3. Provide step-by-step Maths & Reasoning guidance for absolute beginners.
+                4. Evaluate Mains answers with Structure, AP-specific context, and improvement points.
+                Never hallucinate official PYQs; clearly label AI practice questions vs Official PYQs.
+            """.trimIndent())
+        }
+    )
+
+    suspend fun teachTopic(topicName: String): Result<String> {
+        val prompt = "Topic: '$topicName'. Provide Basic to Advanced APPSC Examiner Level Explanation in Telugu with Real-life Examples, 10th Schedule/Articles, and Trap Areas."
+        return callModel(prompt)
+    }
+
+    suspend fun analyzeExaminerMindset(topicName: String): Result<String> {
+        val prompt = "Analyze APPSC Examiner Mindset for topic '$topicName'. Show PYQ trends, tricky statement patterns, and confusion options."
+        return callModel(prompt)
+    }
+
+    suspend fun solveMathsStepByStep(problemText: String): Result<String> {
+        val prompt = "Solve this Maths/Reasoning problem for a beginner: '$problemText'. Show concept, formula justification, step-by-step calculation, and easy tricks."
+        return callModel(prompt)
+    }
+
+    suspend fun evaluateMainsAnswer(question: String, userDraft: String): Result<String> {
+        val prompt = "Evaluate this APPSC Mains Answer.\nQuestion: $question\nStudent Draft: $userDraft\nProvide feedback on Intro, Body, Conclusion, AP Examples, and Marks Range."
+        return callModel(prompt)
+    }
+
+    private suspend fun callModel(prompt: String): Result<String> {
+        return try {
+            val response = masterModel.generateContent(prompt)
+            Result.success(response.text ?: "No response generated.")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+}
+
+package com.aistudio.dc27mission.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun DC27MainScreen() {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    
+    Scaffold(
+        topBar = {
+            Surface(
+                tonalElevation = 8.dp,
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "DC-27: APPSC AI Institute",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Target: Deputy Collector 2027",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Badge {
+                        Text("PRO AI", modifier = Modifier.padding(4.dp))
+                    }
+                }
+            }
+        },
+        bottomBar = {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                NavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    label = { Text("AI Teacher") },
+                    icon = { Text("📚") }
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    label = { Text("MCQ Engine") },
+                    icon = { Text("⚡") }
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    label = { Text("Maths") },
+                    icon = { Text("🧮") }
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    label = { Text("Notes") },
+                    icon = { Text("📌") }
+                )
+            }
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            when (selectedTab) {
+                0 -> ModernAITeacherView()
+                1 -> FeaturePlaceholderView("Advanced MCQ & Examiner Traps Engine")
+                2 -> FeaturePlaceholderView("Maths & Reasoning Personal Trainer")
+                3 -> FeaturePlaceholderView("My Notes, Flashcards & Revision")
+            }
+        }
+    }
+}
+
+@Composable
+fun ModernAITeacherView() {
+    var topicInput by remember { mutableStateOf("") }
+    var resultText by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "ఏ టాపిక్ నేర్చుకోవాలనుకుంటున్నారు?",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = topicInput,
+                    onValueChange = { topicInput = it },
+                    label = { Text("ఉదాహరణకు: Anti-Defection Law") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        isLoading = true
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(if (isLoading) "AI పరిశీలిస్తోంది..." else "AI టీచర్‌తో ప్రారంభించండి")
+                }
+            }
+        }
+
+        if (resultText.isNotEmpty()) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = resultText,
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FeaturePlaceholderView(title: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "$title \n(త్వరలో అందుబాటులోకి వస్తుంది)",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.secondary
+        )
+    }
+}
